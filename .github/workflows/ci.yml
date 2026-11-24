@@ -1,0 +1,61 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**", "chore/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-checks:
+    name: Secret Scan, Format, Analyze and Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: src
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Security Secret Scan (NFR-02)
+        run: |
+          if grep -rnE 'AIza[0-9A-Za-z_-]{35}|GEMINI_API_KEY\s*=' lib/; then
+            echo "ERROR: Hardcoded API key detected in src/lib/!"
+            exit 1
+          else
+            echo "PASS: Zero leaked secrets found in src/lib/."
+          fi
+
+      - name: Set Up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+
+      - name: Show Flutter Version
+        run: flutter --version
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Check Dart Formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze Flutter Code
+        run: flutter analyze
+
+      - name: Run Automated Tests with Coverage
+        run: flutter test --coverage
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov-coverage-report
+          path: src/coverage/lcov.info
